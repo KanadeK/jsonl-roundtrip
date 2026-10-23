@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jsonl-quarantine"
+version = "0.1.0"
+description = "Partition malformed JSON Lines without changing bytes, with verified reconstruction and private diagnostics."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{name = "KanadeK"}]
+dependencies = []
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+]
+
+[project.scripts]
+jsonl-quarantine = "jsonl_quarantine.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/KanadeK/jsonl-quarantine"
+Issues = "https://github.com/KanadeK/jsonl-quarantine/issues"
+
+[project.optional-dependencies]
+dev = ["ruff==0.17.2", "coverage==7.17.0", "build==1.6.1"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.coverage.run]
+source = ["jsonl_quarantine"]
+branch = true
+patch = ["subprocess"]
+parallel = true
+
+[tool.coverage.report]
+show_missing = true
