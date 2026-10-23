@@ -1,7 +1,8 @@
-# jsonl-quarantine 中文说明
+# jsonl-roundtrip 中文说明
 
 把 JSON Lines 中合法的物理行与坏行分开，同时保留**全部原始字节**。
 通过偏移、长度、逐行和整文件 SHA-256 清单，校验后可原样重组输入。
+恢复只需要完整的 bundle，无需原输入文件。使用独立的包及命令名 `jsonl-roundtrip`。
 适合导入预检、日志与离线导出文件；不修改源文件，不猜测修补 JSON，也不打印原始行。
 
 Python 3.11+，无第三方运行时依赖。MIT 许可证。完整规范见 [英文 README](README.md)。
@@ -9,8 +10,8 @@ Python 3.11+，无第三方运行时依赖。MIT 许可证。完整规范见 [�
 ## 安装与完整示例
 
 ```sh
-git clone https://github.com/KanadeK/jsonl-quarantine.git
-cd jsonl-quarantine
+git clone https://github.com/KanadeK/jsonl-roundtrip.git
+cd jsonl-roundtrip
 python -m venv .venv
 ```
 
@@ -20,9 +21,9 @@ Linux/macOS 激活：`source .venv/bin/activate`；PowerShell 激活：`.venv\Sc
 ```sh
 python -m pip install .
 python examples/make_demo.py demo.jsonl
-jsonl-quarantine check demo.jsonl --json
-jsonl-quarantine split demo.jsonl demo-bundle --json
-jsonl-quarantine restore demo-bundle restored.jsonl --json
+jsonl-roundtrip check demo.jsonl --json
+jsonl-roundtrip split demo.jsonl demo-bundle --json
+jsonl-roundtrip restore demo-bundle restored.jsonl --json
 python examples/compare.py demo.jsonl restored.jsonl
 ```
 
@@ -48,7 +49,7 @@ python examples/compare.py demo.jsonl restored.jsonl
 
 退出码：0 为没有坏行或恢复成功；1 为发现并隔离坏行；2 为参数、文件系统、输入变化或 bundle 校验错误。
 `--json` 只输出聚合计数与哈希；操作错误仍是 stderr 的固定安全消息。
-`python -m jsonl_quarantine` 与命令行入口等价。
+`python -m jsonl_roundtrip` 与命令行入口等价。
 
 ## 产物与使用边界
 
@@ -72,6 +73,8 @@ bundle 固定包含 `accepted.jsonl`、`rejected.bin`、逐物理行 `index.json
 坏物理行可能包含拼接记录，或被其他事件引用，隔离后不能据此宣称应用能正常回放。
 
 jsonlines/ndjson 已有跳过坏行能力，jsonrepair 可推断修改；本工具的重点是原字节分区和可逆证据，而非猜测修复。
+[jsonl-quarantine](https://github.com/KanadeK/jsonl-quarantine) 的现有验证流程需要原文件，
+本项目是独立实现，侧重仅凭 bundle 重建原始字节，包名和命令名互不冲突。
 贡献、测试和私密安全报告方式见仓库相关说明。
 
-卸载：`python -m pip uninstall jsonl-quarantine`。不再需要时删除虚拟环境与上述合成示例产物。
+卸载：`python -m pip uninstall jsonl-roundtrip`。不再需要时删除虚拟环境与上述合成示例产物。

@@ -605,7 +605,7 @@ def restore(bundle_dir, output_path):
                     raise QuarantineError("Artifact digest mismatch")
                 _unchanged(bundle / name, handle, path_before, fd_before)
             fd, temporary_name = tempfile.mkstemp(
-                prefix=".jsonl-quarantine-", suffix=".tmp", dir=target.parent
+                prefix=".jsonl-roundtrip-", suffix=".tmp", dir=target.parent
             )
             temporary = Path(temporary_name)
             owned.append((temporary, _identity(os.fstat(fd))))

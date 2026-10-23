@@ -4,7 +4,7 @@ The latest tagged release is the supported version. Security fixes may require
 an upgrade. Run on a supported Python release with current security patches.
 The program makes no network requests and never collects telemetry.
 
-Use GitHub's [private vulnerability reporting](https://github.com/KanadeK/jsonl-quarantine/security/advisories/new)
+Use GitHub's [private vulnerability reporting](https://github.com/KanadeK/jsonl-roundtrip/security/advisories/new)
 to report a reproducible vulnerability. Include a synthetic reproducer, the
 version and the impact. If private reporting is unavailable, open an issue
 requesting a private contact channel **without disclosing the vulnerability**.

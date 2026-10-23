@@ -1,9 +1,11 @@
 # Changelog
 
-## 0.1.0 — 2026-10-23
+## 0.1.0 — 2026-10-24
 
 - Check and partition physical JSON Lines records with strict UTF-8/JSON validation,
   documented duplicate-key and nesting policies, and optional object-only filtering.
+- Publish as jsonl-roundtrip with its own package/command name; reconstruct from
+  the bundle alone without requiring the original input file.
 - Preserve original bytes, CRLF/LF and unterminated final records in fixed artifacts.
 - Stream oversized records and the per-record byte-offset/digest index.
 - Verify artifact hashes, metadata schemas, line/stream sequencing, physical LF

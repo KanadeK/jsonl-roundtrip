@@ -34,22 +34,22 @@ def run(arguments, *, cwd, expected=0):
 
 def main():
     root = Path(__file__).resolve().parents[1]
-    wheels = sorted((root / "dist").glob("jsonl_quarantine-*.whl"))
+    wheels = sorted((root / "dist").glob("jsonl_roundtrip-*.whl"))
     if len(wheels) != 1:
         raise SystemExit("Build exactly one current wheel in dist/ first")
-    with tempfile.TemporaryDirectory(prefix="jsonl-quarantine-smoke-") as directory:
+    with tempfile.TemporaryDirectory(prefix="jsonl-roundtrip-smoke-") as directory:
         work = Path(directory)
         environment = work / "fresh-venv"
         venv.EnvBuilder(with_pip=True).create(environment)
         scripts = environment / ("Scripts" if os.name == "nt" else "bin")
         python = scripts / ("python.exe" if os.name == "nt" else "python")
-        command = scripts / ("jsonl-quarantine.exe" if os.name == "nt" else "jsonl-quarantine")
+        command = scripts / ("jsonl-roundtrip.exe" if os.name == "nt" else "jsonl-roundtrip")
         run([python, "-m", "pip", "install", "--no-index", "--no-deps", wheels[0]], cwd=work)
         source = work / "synthetic.jsonl"
         raw = b'{"synthetic":true}\r\nPRIVATE_SYNTHETIC_BROKEN_ROW\nnull'
         source.write_bytes(raw)
         checked = run(
-            [python, "-m", "jsonl_quarantine", "check", source, "--json"], cwd=work, expected=1
+            [python, "-m", "jsonl_roundtrip", "check", source, "--json"], cwd=work, expected=1
         )
         if json.loads(checked.stdout)["rejected_lines"] != 1:
             raise RuntimeError("Check must identify the synthetic malformed line")
@@ -78,12 +78,12 @@ def main():
             raise RuntimeError("README demonstration counts disagree")
         run([command, "restore", demo_bundle, demo_restored, "--json"], cwd=work)
         run([python, root / "examples" / "compare.py", demo, demo_restored], cwd=work)
-        run([python, "-m", "pip", "uninstall", "-y", "jsonl-quarantine"], cwd=work)
+        run([python, "-m", "pip", "uninstall", "-y", "jsonl-roundtrip"], cwd=work)
         probe = run(
             [
                 python,
                 "-c",
-                "import importlib.util; print(importlib.util.find_spec('jsonl_quarantine'))",
+                "import importlib.util; print(importlib.util.find_spec('jsonl_roundtrip'))",
             ],
             cwd=work,
         )

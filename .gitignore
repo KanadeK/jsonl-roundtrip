@@ -14,7 +14,7 @@ demo-output/
 /demo.jsonl
 /demo-bundle/
 /restored.jsonl
-.jsonl-quarantine-*.tmp
+.jsonl-roundtrip-*.tmp
 *.log
 .DS_Store
 Thumbs.db

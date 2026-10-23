@@ -10,8 +10,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from jsonl_quarantine import core
-from jsonl_quarantine.core import QuarantineError, inspect, partition, restore
+from jsonl_roundtrip import core
+from jsonl_roundtrip.core import QuarantineError, inspect, partition, restore
 
 
 def sha(raw):
@@ -127,7 +127,7 @@ class FilesystemAndRecoveryTests(BundleCase):
     def test_fifo_is_rejected_without_waiting_for_a_writer(self):
         os.mkfifo(self.source)
         result = subprocess.run(
-            [sys.executable, "-m", "jsonl_quarantine", "check", str(self.source), "--json"],
+            [sys.executable, "-m", "jsonl_roundtrip", "check", str(self.source), "--json"],
             capture_output=True,
             timeout=5,
             check=False,

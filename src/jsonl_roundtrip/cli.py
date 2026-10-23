@@ -63,7 +63,7 @@ def main(argv=None):
                 else inspect(args.source, **options)
             )
     except QuarantineError as exc:
-        parser.exit(2, "jsonl-quarantine: " + str(exc) + "\n")
+        parser.exit(2, "jsonl-roundtrip: " + str(exc) + "\n")
     if args.json:
         print(json.dumps(summary, sort_keys=True, ensure_ascii=True))
     elif args.command == "restore":

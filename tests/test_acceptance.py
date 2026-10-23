@@ -11,7 +11,7 @@ import tracemalloc
 import unittest
 from pathlib import Path
 
-from jsonl_quarantine.core import QuarantineError, inspect, partition, restore
+from jsonl_roundtrip.core import QuarantineError, inspect, partition, restore
 
 
 class ReversibleWorkflowTests(unittest.TestCase):
@@ -107,6 +107,13 @@ class ReversibleWorkflowTests(unittest.TestCase):
         self.assertEqual(summary["reason_counts"], {})
         self.assert_roundtrip(b"")
 
+    def test_restore_needs_only_bundle_when_original_is_unavailable(self):
+        raw = b'{"kept":true}\r\nBROKEN_SYNTHETIC_RECORD\nnull'
+        self.split(raw)
+        self.source.unlink()
+        self.assert_roundtrip(raw)
+        self.assertFalse(self.source.exists())
+
     def test_last_record_does_not_need_a_newline(self):
         raw = b'{}\r\n{"final":true}'
         summary = self.split(raw)
@@ -193,7 +200,7 @@ class ReversibleWorkflowTests(unittest.TestCase):
 
         def command(*args):
             return subprocess.run(
-                [sys.executable, "-m", "jsonl_quarantine", *map(str, args)],
+                [sys.executable, "-m", "jsonl_roundtrip", *map(str, args)],
                 cwd=self.root,
                 env=environment,
                 capture_output=True,

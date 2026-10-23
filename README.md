@@ -1,4 +1,4 @@
-# jsonl-quarantine
+# jsonl-roundtrip
 
 Keep the usable records in a damaged JSON Lines export **without losing the
 original bytes**. Quarantine bad physical lines, record offsets and SHA-256
@@ -10,11 +10,14 @@ This is an offline CLI for data imports, logs and exported files. It never edits
 the source, guesses missing JSON, or prints record contents. The accepted and
 rejected artifacts still contain the original data: **offline is not encrypted**.
 
+After splitting, the bundle alone is enough to reconstruct the original bytes;
+restoration does not require keeping the original input file alongside it.
+
 ## Install
 
 ```sh
-git clone https://github.com/KanadeK/jsonl-quarantine.git
-cd jsonl-quarantine
+git clone https://github.com/KanadeK/jsonl-roundtrip.git
+cd jsonl-roundtrip
 python -m venv .venv
 ```
 
@@ -37,7 +40,7 @@ python -m pip install .
 ```
 
 Alternatively, download the wheel from this repository's GitHub Release and use
-`python -m pip install --no-index --no-deps path/to/jsonl_quarantine-0.1.0-py3-none-any.whl`.
+`python -m pip install --no-index --no-deps path/to/jsonl_roundtrip-0.1.0-py3-none-any.whl`.
 No PyPI publication is implied. Installing from source can download setuptools
 as build tooling; the installed command has no network behavior.
 
@@ -50,9 +53,9 @@ supported for output. Unsupported publication fails without overwriting files.
 
 ```sh
 python examples/make_demo.py demo.jsonl
-jsonl-quarantine check demo.jsonl --json
-jsonl-quarantine split demo.jsonl demo-bundle --json
-jsonl-quarantine restore demo-bundle restored.jsonl --json
+jsonl-roundtrip check demo.jsonl --json
+jsonl-roundtrip split demo.jsonl demo-bundle --json
+jsonl-roundtrip restore demo-bundle restored.jsonl --json
 python examples/compare.py demo.jsonl restored.jsonl
 ```
 
@@ -70,12 +73,12 @@ The restore destination must be **outside the bundle directory**.
 ## Commands and policy
 
 ```text
-jsonl-quarantine check INPUT [--max-line-bytes N] [--objects-only] [--json]
-jsonl-quarantine split INPUT OUTPUT_DIR [--max-line-bytes N] [--objects-only] [--json]
-jsonl-quarantine restore BUNDLE OUTPUT [--json]
+jsonl-roundtrip check INPUT [--max-line-bytes N] [--objects-only] [--json]
+jsonl-roundtrip split INPUT OUTPUT_DIR [--max-line-bytes N] [--objects-only] [--json]
+jsonl-roundtrip restore BUNDLE OUTPUT [--json]
 ```
 
-`python -m jsonl_quarantine` provides the same interface. Top-level `--help` and
+`python -m jsonl_roundtrip` provides the same interface. Top-level `--help` and
 `--version` do not need input files.
 
 Input is split on the physical **LF byte only**. CRLF is preserved. A missing
@@ -209,6 +212,10 @@ application-correct.
 [ndjson](https://github.com/ndjson/ndjson.js) already support reading while
 skipping invalid records. [jsonrepair](https://github.com/josdejong/jsonrepair)
 repairs malformed JSON by inferring edits. Choose them for those workflows.
+[jsonl-quarantine](https://github.com/KanadeK/jsonl-quarantine) provides a
+source-referenced quarantine/accounting workflow whose verifier requires the
+original input. This independently implemented tool uses its own package and
+command name and adds verified reconstruction from the bundle alone.
 This project's focus is **raw-byte partitions plus verified reversible evidence**;
 it does not invent another JSON syntax or claim novel repair algorithms.
 
@@ -217,6 +224,6 @@ smoke test, [SECURITY.md](SECURITY.md) for private reporting, and
 [CHANGELOG.md](CHANGELOG.md) for the version boundary. CI checks Python 3.11/3.13
 and Windows/macOS/Linux; platform-dependent tests report skips explicitly.
 
-Uninstall with `python -m pip uninstall jsonl-quarantine`. Delete the virtual
+Uninstall with `python -m pip uninstall jsonl-roundtrip`. Delete the virtual
 environment and your synthetic `demo.jsonl`, `demo-bundle` and `restored.jsonl`
 when no longer needed. The program does not create a persistent service or cache.
