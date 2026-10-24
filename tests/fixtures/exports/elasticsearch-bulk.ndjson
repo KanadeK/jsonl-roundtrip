@@ -1,0 +1,5 @@
+{"index":{"_index":"synthetic-export-fixture","_id":"evt-001"}}
+{"message":"line one\nline two","label":"雪","optional":null,"nested":{"ok":true}}
+{"delete":{"_index":"synthetic-export-fixture","_id":"evt-002"}}
+{"create":{"_index":"synthetic-export-fixture","_id":"evt-003"}}
+{"message":"escaped quote \" and slash \\","tags":["a",null],"large_id":9007199254740993}

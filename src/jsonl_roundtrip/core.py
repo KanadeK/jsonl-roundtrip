@@ -16,6 +16,8 @@ from pathlib import Path
 
 DEFAULT_MAX_LINE_BYTES = 8 * 1024 * 1024
 MAX_LINE_BYTES = 64 * 1024 * 1024
+DEFAULT_MAX_OUTPUT_BYTES = 1024 * 1024 * 1024
+MAX_OUTPUT_BYTES = 2**63 - 1
 _CHUNK = 64 * 1024
 _MANIFEST_LIMIT = 64 * 1024
 _INDEX_LINE_LIMIT = 2048
@@ -51,6 +53,43 @@ _INDEX_KEYS = frozenset(("line", "offset", "length", "stream", "stream_offset", 
 
 class QuarantineError(ValueError):
     """Configuration, filesystem, unstable-source or bundle validation error."""
+
+
+class OutputQuotaExceeded(QuarantineError):
+    """A write would exceed this invocation's total logical output-byte budget."""
+
+
+class _OutputBudget:
+    def __init__(self, limit):
+        if type(limit) is not int or not 1 <= limit <= MAX_OUTPUT_BYTES:
+            raise QuarantineError(
+                "max_output_bytes must be an integer from 1 through 9223372036854775807"
+            )
+        self.limit = limit
+        self.used = 0
+
+    def check(self, size):
+        if size > self.limit - self.used:
+            raise OutputQuotaExceeded("Total output byte quota exceeded")
+
+    def consume(self, size):
+        # Check before sending bytes to a buffered or unbuffered file writer.
+        # Hard-link publication adds a name, not another copy of these bytes.
+        self.check(size)
+        self.used += size
+
+
+class _QuotaWriter:
+    """Keep the budget at the file-write boundary, including future callers."""
+
+    def __init__(self, handle, budget):
+        self.handle = handle
+        self.budget = budget
+
+    def write(self, data):
+        # A cast buffer's element count can be smaller than its byte count.
+        self.budget.consume(memoryview(data).nbytes)
+        return self.handle.write(data)
 
 
 class _InvalidRecord(Exception):
@@ -121,8 +160,8 @@ def _cleanup(owned):
 
 
 class _Sink:
-    def __init__(self, handle=None):
-        self.handle = handle
+    def __init__(self, handle=None, *, budget=None):
+        self.handle = _QuotaWriter(handle, budget) if budget is not None else handle
         self.bytes = 0
         self.digest = hashlib.sha256()
 
@@ -325,13 +364,23 @@ def inspect(source, *, max_line_bytes=DEFAULT_MAX_LINE_BYTES, objects_only=False
         raise QuarantineError("Cannot check the input file") from exc
 
 
-def partition(source, output_dir, *, max_line_bytes=DEFAULT_MAX_LINE_BYTES, objects_only=False):
+def partition(
+    source,
+    output_dir,
+    *,
+    max_line_bytes=DEFAULT_MAX_LINE_BYTES,
+    objects_only=False,
+    max_output_bytes=DEFAULT_MAX_OUTPUT_BYTES,
+):
     """Create an exclusive complete bundle, preserving every original byte.
 
     Rejects are a successful quarantine outcome, reflected in the returned counts.
-    A valid manifest is published last. Handled failures remove only owned files.
+    A valid manifest is published last. The budget includes every artifact and
+    manifest byte. Handled failures, including quota exhaustion, remove only
+    owned files. Filesystem allocation overhead is outside this logical budget.
     """
     _policy(max_line_bytes, objects_only)
+    budget = _OutputBudget(max_output_bytes)
     owned = []
     directory = None
     directory_identity = None
@@ -340,12 +389,15 @@ def partition(source, output_dir, *, max_line_bytes=DEFAULT_MAX_LINE_BYTES, obje
         source_path = Path(source).absolute()
         with ExitStack() as source_stack:
             reader, path_before, fd_before = _regular_reader(source_path, source_stack)
+            # The two partitions alone must contain at least the input bytes.
+            # Reject an impossible budget before creating any output directory.
+            budget.check(fd_before.st_size)
             directory = Path(output_dir).absolute()
             directory.mkdir(mode=0o700)
             directory_identity = _identity(directory.lstat())
             with ExitStack() as write_stack:
                 sinks = {
-                    name: _Sink(_owned_writer(directory / name, write_stack, owned))
+                    name: _Sink(_owned_writer(directory / name, write_stack, owned), budget=budget)
                     for name in _ARTIFACTS
                 }
                 summary = _scan(
@@ -362,10 +414,13 @@ def partition(source, output_dir, *, max_line_bytes=DEFAULT_MAX_LINE_BYTES, obje
                 "policy": {"max_line_bytes": max_line_bytes, "objects_only": objects_only},
                 "artifacts": {name: sink.metadata() for name, sink in sinks.items()},
             }
+            raw = _json_line(manifest)
+            budget.check(len(raw))
             temporary_manifest = directory / ".manifest.tmp"
             with ExitStack() as manifest_stack:
-                writer = _owned_writer(temporary_manifest, manifest_stack, owned)
-                raw = _json_line(manifest)
+                writer = _QuotaWriter(
+                    _owned_writer(temporary_manifest, manifest_stack, owned), budget
+                )
                 if writer.write(raw) != len(raw):
                     raise QuarantineError("Could not write a complete manifest")
             # Hard-link creation is atomic and fails if the destination exists.
@@ -564,12 +619,15 @@ def _reconstruct(manifest, handles, output):
     return {"format_version": 1, "bytes": offset, "sha256": fingerprint.hexdigest()}
 
 
-def restore(bundle_dir, output_path):
+def restore(bundle_dir, output_path, *, max_output_bytes=DEFAULT_MAX_OUTPUT_BYTES):
     """Validate a bundle completely before exclusively publishing its reconstruction.
 
     Fixed artifact names prevent metadata-controlled path traversal. Publication
     uses an exclusive hard link and requires support in the output filesystem.
+    The budget covers the new temporary/final data inode, counted once, and does
+    not include the pre-existing bundle or filesystem allocation overhead.
     """
+    budget = _OutputBudget(max_output_bytes)
     owned = []
     temporary = None
     try:
@@ -592,6 +650,9 @@ def restore(bundle_dir, output_path):
                 raise QuarantineError("Manifest exceeds size limit")
             manifest = _metadata_json(raw)
             _manifest_schema(manifest)
+            # Check before hashing potentially large artifacts or creating a
+            # temporary output; every reconstruction write is checked as well.
+            budget.check(manifest["input_bytes"])
             handles = {}
             for name in _ARTIFACTS:
                 handle, path_before, fd_before = _regular_reader(bundle / name, stack)
@@ -610,7 +671,7 @@ def restore(bundle_dir, output_path):
             temporary = Path(temporary_name)
             owned.append((temporary, _identity(os.fstat(fd))))
             with os.fdopen(fd, "wb") as output:
-                summary = _reconstruct(manifest, handles, output)
+                summary = _reconstruct(manifest, handles, _QuotaWriter(output, budget))
             for name, (handle, path_before, fd_before) in baselines.items():
                 _unchanged(bundle / name, handle, path_before, fd_before)
             # Each fixed input file has its own baseline; also reject replacement

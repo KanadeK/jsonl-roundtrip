@@ -13,7 +13,7 @@ python -m ruff check .
 python -m ruff format --check .
 python -m coverage run -m unittest discover -s tests -v
 python -m coverage combine
-python -m coverage report
+python -m coverage report --fail-under=85
 python -m build
 python scripts/installed_smoke.py
 ```
@@ -34,6 +34,27 @@ entrypoint, quarantine/restore byte equality and uninstall from a clean working
 directory. It needs a hard-link-capable temporary filesystem. Building from
 source may download setuptools; the smoke installation and installed program
 do not use the network. Keep exactly one current wheel in `dist/`.
+
+The smoke workflow also checks exact/insufficient output budgets, failure cleanup,
+all four export fixtures and the actual v0.1.0 bundle using the installed command.
+Fixtures are included in the source distribution; Git text conversion must stay
+disabled for them so CRLF and unterminated records remain unchanged.
+
+To rerun the real exporters, use a separate Python 3.13 environment:
+
+```sh
+python -m pip install .
+python -m pip install -r scripts/export-requirements.txt
+python scripts/export_producer_smoke.py
+```
+
+This runs pinned DuckDB/pandas against original synthetic rows and checks the
+committed bytes plus clean/damaged bundle-only recovery. These are optional
+development dependencies, never runtime requirements. See
+[fixture provenance](tests/fixtures/exports/README.md) before updating them.
+The main tests need no exporter packages. Quota tests audit actual requested
+file-write bytes across all output handles, including temporary manifest/output
+files; do not replace those assertions with checks of final file size alone.
 
 This repository currently has one maintainer. CI checks and builds artifacts;
 it never commits code. Third-party pull requests are reviewed before any

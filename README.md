@@ -40,7 +40,7 @@ python -m pip install .
 ```
 
 Alternatively, download the wheel from this repository's GitHub Release and use
-`python -m pip install --no-index --no-deps path/to/jsonl_roundtrip-0.1.0-py3-none-any.whl`.
+`python -m pip install --no-index --no-deps path/to/jsonl_roundtrip-0.2.0-py3-none-any.whl`.
 No PyPI publication is implied. Installing from source can download setuptools
 as build tooling; the installed command has no network behavior.
 
@@ -74,8 +74,8 @@ The restore destination must be **outside the bundle directory**.
 
 ```text
 jsonl-roundtrip check INPUT [--max-line-bytes N] [--objects-only] [--json]
-jsonl-roundtrip split INPUT OUTPUT_DIR [--max-line-bytes N] [--objects-only] [--json]
-jsonl-roundtrip restore BUNDLE OUTPUT [--json]
+jsonl-roundtrip split INPUT OUTPUT_DIR [--max-line-bytes N] [--objects-only] [--max-output-bytes N] [--json]
+jsonl-roundtrip restore BUNDLE OUTPUT [--max-output-bytes N] [--json]
 ```
 
 `python -m jsonl_roundtrip` provides the same interface. Top-level `--help` and
@@ -124,6 +124,42 @@ summaries. Neither record text, object keys nor source paths enter the report.
 Unknown command-line arguments are handled by Python's argument parser; avoid
 passing sensitive content as command-line options.
 
+## Total output quota
+
+Since v0.2.0, `split` and `restore` each default to a **1 GiB (1,073,741,824 byte)**
+total output limit. Set `--max-output-bytes N` to any integer from **1** through
+**9,223,372,036,854,775,807**. The limit is inclusive; zero does not disable it.
+For example, allow up to 64 MiB for a complete bundle:
+
+```sh
+jsonl-roundtrip split demo.jsonl bounded-bundle --max-output-bytes 67108864 --json
+jsonl-roundtrip restore bounded-bundle bounded-restored.jsonl --max-output-bytes 67108864 --json
+```
+
+- `split` shares one budget across **accepted.jsonl + rejected.bin + index.jsonl
+  + manifest.json**. A budget equal to the input size is usually too small:
+  many tiny records produce a much larger index. Manifest temporary and final
+  names are hard links to the same bytes, counted once.
+- `restore` budgets the **new reconstructed file**, including its temporary
+  writes. The existing bundle is excluded; publishing the final hard link does
+  not copy the data. A restored file exactly equal to the limit is allowed.
+- Every output write is checked before bytes reach the file writer. Impossible
+  budgets detected from input/manifest sizes fail before creating output files.
+  Exceeding the budget exits **2** with a fixed, content-free quota error and no
+  success JSON. Normal failure cleanup preserves foreign/replaced files and
+  removes only files owned by this invocation.
+
+This counts **logical file-content bytes**, not allocated disk blocks, filesystem
+metadata, existing input/bundle bytes, or files created by other processes. Leave
+space for those costs; use filesystem/OS quotas when physical disk allocation
+must be enforced. `check` creates no output files and has no output-quota option.
+There is no total runtime quota. Abrupt termination has the cleanup limits below.
+
+When upgrading, explicitly raise the limit for existing bundles or workflows
+larger than 1 GiB. Bundle format version 1 and all aggregate JSON summary keys
+are unchanged. The quota is an execution limit, not a recorded classification
+policy; v0.1.0 and v0.2.0 bundles remain mutually restorable.
+
 ## Bundle format, version 1
 
 A completed bundle has four fixed files:
@@ -153,6 +189,10 @@ Source filenames, machine paths, timestamps and record contents are omitted.
 The Python `partition` and `inspect` APIs return the seven aggregate manifest
 fields through `reason_counts`; `restore` returns `format_version`, `bytes` and
 `sha256`. Operational exceptions use `QuarantineError(ValueError)`.
+The Python `partition(..., max_output_bytes=N)` and
+`restore(..., max_output_bytes=N)` APIs use the same default/range as the CLI.
+Quota exhaustion raises `jsonl_roundtrip.core.OutputQuotaExceeded`, a subclass
+of `QuarantineError`. Boolean, float and string limits are rejected by the APIs.
 
 Restore rejects unknown/duplicate metadata keys, unsupported versions, invalid
 types and hashes, symlink/nonregular artifact files, gaps/overlaps/out-of-order
@@ -192,9 +232,9 @@ twice. Restore reads artifacts to verify hashes and again to reconstruct them.
 The index grows with the number of physical records. For many tiny or blank lines,
 it can be **much larger than the input**. Splitting needs space for both partitions
 (together equal to input size), the index and manifest. Restoration additionally
-needs the original-size temporary output. There is no total line-count, output-size
-or runtime quota beyond the format's count limits; use OS/job-runner quotas for
-untrusted large workloads. Normal records can use memory proportional to the
+needs the original-size temporary output. The output quota above bounds this
+invocation's logical writes, including index amplification; it is not a line-count,
+runtime or process-memory quota. Normal records can use memory proportional to the
 configured line limit and decoded JSON; the streaming index does not retain the
 whole file in memory.
 
@@ -205,6 +245,22 @@ encryption, schema validation or semantic session repair. One quarantined
 physical line might contain several concatenated records or a referenced event;
 the tool preserves it for review rather than claiming the remaining session is
 application-correct.
+
+## Export format regressions
+
+The test suite includes original synthetic fixtures from **actual DuckDB 2.0.0
+JSON COPY and pandas 3.1.0 records/lines exports**, plus explicitly hand-authored
+Elasticsearch Bulk NDJSON and MongoDB Extended JSON v2 examples based on their
+official specifications. It covers Unicode/escaped newlines, nested/null values,
+large integers, CRLF, missing final LF and deliberately damaged export records.
+Tests remove the original file and restore using only the bundle. A separate CI
+job reruns both pinned exporters and compares their output to committed bytes.
+
+These are syntax/byte preservation checks. Elasticsearch action/source pairing
+and required final LF are not validated; the accepted partition may be unsafe to
+replay as a Bulk request. MongoDB wrappers are ordinary JSON objects here, not
+validated database types. No Elasticsearch server or `mongoexport` was run.
+See [fixture provenance and reproduction](tests/fixtures/exports/README.md).
 
 ## Alternatives and development
 

@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "data_origin": "Original synthetic records created for this project; no real user export or copied dataset.",
+  "fixtures": [
+    {
+      "file": "duckdb-copy.ndjson",
+      "records": 3,
+      "bytes": 522,
+      "sha256": "cc8cdac91d99e0fd81a073e5965e1272b2e503bffda5071e0a2d64ef16e7e7a8",
+      "provenance": "real-tool-generated-synthetic",
+      "producer": "duckdb",
+      "producer_version": "2.0.0",
+      "sources": [
+        "https://duckdb.org/docs/2.0/sql/statements/copy",
+        "https://pypi.org/project/duckdb/2.0.0/"
+      ]
+    },
+    {
+      "file": "pandas-records.ndjson",
+      "records": 3,
+      "bytes": 478,
+      "sha256": "c15e54674e015a63d9b630a7f02ec40f4f7c1d6da441e9668284f55c8d4774c3",
+      "provenance": "real-tool-generated-synthetic",
+      "producer": "pandas",
+      "producer_version": "3.1.0",
+      "sources": [
+        "https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.to_json.html",
+        "https://pypi.org/project/pandas/3.1.0/"
+      ]
+    },
+    {
+      "file": "elasticsearch-bulk.ndjson",
+      "records": 5,
+      "bytes": 373,
+      "sha256": "15a0c0f34ee3e32ff297f0d1bb4d1d3a89d888d6752e8fd1247b3632013ca4d2",
+      "provenance": "source-derived-hand-authored-synthetic",
+      "producer": null,
+      "producer_version": null,
+      "sources": [
+        "https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-bulk"
+      ]
+    },
+    {
+      "file": "mongodb-extended.ndjson",
+      "records": 3,
+      "bytes": 620,
+      "sha256": "3bdb464f0a17d0d457130121eed814600111cf3a0241d4dc2f4b5f495436a23c",
+      "provenance": "source-derived-hand-authored-synthetic",
+      "producer": null,
+      "producer_version": null,
+      "sources": [
+        "https://www.mongodb.com/docs/manual/reference/mongodb-extended-json/"
+      ]
+    }
+  ]
+}

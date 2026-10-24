@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import tempfile
+import tomllib
 import venv
 from pathlib import Path
 
@@ -45,6 +46,11 @@ def main():
         python = scripts / ("python.exe" if os.name == "nt" else "python")
         command = scripts / ("jsonl-roundtrip.exe" if os.name == "nt" else "jsonl-roundtrip")
         run([python, "-m", "pip", "install", "--no-index", "--no-deps", wheels[0]], cwd=work)
+        version = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))["project"][
+            "version"
+        ]
+        if run([command, "--version"], cwd=work).stdout.strip() != version:
+            raise RuntimeError("Installed version disagrees with the source release")
         source = work / "synthetic.jsonl"
         raw = b'{"synthetic":true}\r\nPRIVATE_SYNTHETIC_BROKEN_ROW\nnull'
         source.write_bytes(raw)
@@ -60,10 +66,41 @@ def main():
             raise RuntimeError("Split counts disagree")
         if "PRIVATE_SYNTHETIC_BROKEN_ROW" in split.stdout + split.stderr:
             raise RuntimeError("Split disclosed a private record")
+        budget = sum(path.stat().st_size for path in bundle.iterdir())
+        for cap, name in ((budget, "exact"), (budget - 1, "short")):
+            bounded = work / name
+            result = run(
+                [command, "split", source, bounded, "--max-output-bytes", cap, "--json"],
+                cwd=work,
+                expected=1 if cap == budget else 2,
+            )
+            if cap == budget:
+                if sum(path.stat().st_size for path in bounded.iterdir()) != budget:
+                    raise RuntimeError("Exact split quota changed the output bytes")
+            elif (
+                bounded.exists()
+                or result.stdout
+                or result.stderr.strip() != "jsonl-roundtrip: Total output byte quota exceeded"
+            ):
+                raise RuntimeError("Split quota failure leaked data or left output")
+        denied = work / "denied.jsonl"
+        failed = run(
+            [command, "restore", bundle, denied, "--max-output-bytes", len(raw) - 1, "--json"],
+            cwd=work,
+            expected=2,
+        )
+        if denied.exists() or failed.stdout or list(work.glob(".jsonl-roundtrip-*.tmp")):
+            raise RuntimeError("Restoration quota failure left output")
+        if source.read_bytes() != raw:
+            raise RuntimeError("Source preservation failed")
+        source.unlink()
         output = work / "restored.jsonl"
-        restored = run([command, "restore", bundle, output, "--json"], cwd=work)
-        if output.read_bytes() != raw or source.read_bytes() != raw:
-            raise RuntimeError("Byte-exact restoration or source preservation failed")
+        restored = run(
+            [command, "restore", bundle, output, "--max-output-bytes", len(raw), "--json"],
+            cwd=work,
+        )
+        if output.read_bytes() != raw or source.exists():
+            raise RuntimeError("Bundle-only byte-exact restoration failed")
         if json.loads(restored.stdout)["sha256"] != hashlib.sha256(raw).hexdigest():
             raise RuntimeError("Restored digest disagrees")
         valid = work / "valid.jsonl"
@@ -78,6 +115,26 @@ def main():
             raise RuntimeError("README demonstration counts disagree")
         run([command, "restore", demo_bundle, demo_restored, "--json"], cwd=work)
         run([python, root / "examples" / "compare.py", demo, demo_restored], cwd=work)
+        fixtures = root / "tests" / "fixtures"
+        exports = sorted((fixtures / "exports").glob("*.ndjson"))
+        if len(exports) != 4:
+            raise RuntimeError("Expected four documented export fixtures")
+        for index, fixture in enumerate(exports):
+            exported = work / f"export-{index}.jsonl"
+            exported.write_bytes(fixture.read_bytes())
+            export_bundle = work / f"export-bundle-{index}"
+            export_output = work / f"export-output-{index}.jsonl"
+            run([command, "split", exported, export_bundle, "--objects-only", "--json"], cwd=work)
+            exported.unlink()
+            run([command, "restore", export_bundle, export_output, "--json"], cwd=work)
+            if export_output.read_bytes() != fixture.read_bytes():
+                raise RuntimeError("Installed CLI export fixture recovery failed")
+        legacy = work / "legacy-restored.jsonl"
+        run([command, "restore", fixtures / "legacy-v0.1.0", legacy, "--json"], cwd=work)
+        if hashlib.sha256(legacy.read_bytes()).hexdigest() != (
+            "1b9ff476e11a7de1adba6dbecceb2e8e7db4f8c00aa7b9cb22d4c4f27928a0db"
+        ):
+            raise RuntimeError("Installed CLI v0.1.0 bundle compatibility failed")
         run([python, "-m", "pip", "uninstall", "-y", "jsonl-roundtrip"], cwd=work)
         probe = run(
             [
@@ -90,7 +147,8 @@ def main():
         if probe.stdout.strip() != "None":
             raise RuntimeError("Package remains importable after uninstall")
     print(
-        "Fresh offline wheel install, module/entrypoint, quarantine, roundtrip and uninstall: PASS"
+        "Fresh offline wheel install, exact/failed quotas, four export formats, "
+        "legacy bundle, README demo, bundle-only roundtrip and uninstall: PASS"
     )
 
 

@@ -1,0 +1,3 @@
+{"_id":{"$oid":"0123456789abcdef01234567"},"count":{"$numberInt":"42"},"sequence":{"$numberLong":"9223372036854775807"},"amount":{"$numberDecimal":"1234567890.12345678901234567890"},"at":{"$date":{"$numberLong":"1767225600000"}},"message":"escaped\nnewline","nested":{"active":true,"optional":null}}
+{"_id":{"$oid":"89abcdef0123456701234567"},"at":{"$date":"2026-01-02T03:04:05.000Z"},"counter":9007199254740993,"payload":null,"label":"你好🙂","nested":[null,false,{"source":"synthetic"}]}
+{"value":{"$numberDouble":"NaN"},"limit":{"$numberDouble":"Infinity"},"raw":{"$binary":{"base64":"AAECAw==","subType":"00"}}}

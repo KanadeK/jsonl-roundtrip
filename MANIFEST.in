@@ -2,4 +2,6 @@ include README.md README.zh-CN.md LICENSE CONTRIBUTING.md SECURITY.md THIRD_PART
 include VALIDATION.md
 recursive-include examples *.py
 recursive-include tests *.py
+recursive-include tests/fixtures *
 recursive-include scripts *.py
+include scripts/export-requirements.txt

@@ -1,0 +1,2 @@
+# These regression fixtures assert exact bytes, including selected CRLF records.
+*.ndjson -text
